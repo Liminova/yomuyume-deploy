@@ -1,0 +1,30 @@
+version: "3"
+services:
+    yomuyume-client:
+        container_name: yomuyume-client
+        image: yomuyume-client
+        restart: unless-stopped
+        build:
+            context: .
+            dockerfile: client.Dockerfile
+        ports:
+            - "3000:3000"
+    yomuyume-server:
+        container_name: yomuyume-server
+        image: yomuyume-server
+        restart: unless-stopped
+        build:
+            context: .
+            dockerfile: server.Dockerfile
+        ports:
+            - "3001:3000"
+        volumes:
+            - ./sqlite.db:/usr/local/bin/sqlite.db
+            - /<CHANGE_ME>:/library
+        environment:
+            - JWT_SECRET=secret
+            - DATABASE_URL=sqlite:/usr/local/bin/sqlite.db
+            - JWT_MAXAGE_HOUR=2592000
+            - SERVER_PORT=3000
+            - LIBRARY_PATH=/library
+            - TEMP_DIR=/tmp
