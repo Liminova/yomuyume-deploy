@@ -1,0 +1,32 @@
+*.example.com {
+	# disable if use other reverse proxy
+	tls {
+		dns <PROVIDER> <PROVIDE_TOKEN>
+	}
+
+	@comic host comic.example.com # or http://comic.example.com if just want Caddy to route
+=	handle @comic {
+		route /api/* {
+			reverse_proxy yomuyume-server:3000
+		}
+		route /swagger {
+			reverse_proxy yomuyume-server:3000
+		}
+		route /swagger/* {
+			reverse_proxy yomuyume-server:3000
+		}
+		route /api-docs {
+			reverse_proxy yomuyume-server:3000
+		}
+		route /api-docs/* {
+			reverse_proxy yomuyume-server:3000
+		}
+		route /redoc {
+			reverse_proxy yomuyume-server:3000
+		}
+		route /redoc/* {
+			reverse_proxy yomuyume-server:3000
+		}
+		reverse_proxy yomuyume-client:3000
+	}
+}

@@ -8,7 +8,10 @@ services:
             context: .
             dockerfile: client.Dockerfile
         ports:
-            - "3000:3000"
+           - "3000:3000"
+        # networks:
+        #     - yomuyume
+
     yomuyume-server:
         container_name: yomuyume-server
         image: yomuyume-server
@@ -16,15 +19,67 @@ services:
         build:
             context: .
             dockerfile: server.Dockerfile
-        ports:
-            - "3001:3000"
         volumes:
+            # path in container must match DATABASE_URL
             - ./sqlite.db:/usr/local/bin/sqlite.db
-            - /<CHANGE_ME>:/library
+            # path in container must match LIBRARY_PATH
+            - ./library:/library
+        ports:
+           - "3001:3000"
         environment:
-            - JWT_SECRET=secret
-            - DATABASE_URL=sqlite:/usr/local/bin/sqlite.db
-            - JWT_MAXAGE_HOUR=2592000
-            - SERVER_PORT=3000
-            - LIBRARY_PATH=/library
-            - TEMP_DIR=/tmp
+            # - APP_NAME: "Yomuyume" # optional
+            - LIBRARY_PATH: "/library"
+            # - SERVER_ADDRESS: "0.0.0.0" # optional, better not change it
+            # - SERVER_PORT: 3000 # optional, better not change it
+            - DATABASE_URL: "sqlite:/usr/local/bin/sqlite.db"
+
+            - JWT_SECRET: "<CHANGE_ME>"
+            - JWT_MAXAGE_HOUR: 2592000 # 30 days
+
+            # SMTP optional, but users can't reset password and delete account
+            # - SMTP_HOST: "smtp.gmail.com"
+            # - SMTP_PORT: 587
+            # - SMTP_SECURE: tls
+            # - SMTP_USER: <CHANGE_ME>
+            # - SMTP_PASS: <CHANGE_ME> # https://myaccount.google.com/apppasswords
+            # - SMTP_FROM: <CHANGE_ME>@gmail.com
+            # - SMTP_FROM_NAME: "Yomuyume"
+
+            # - FFMPEG_PATH: # if library contains avif or other codec
+            # - DJXL_PATH: # if library contains jpeg-xl images
+            # - FFMPEG_LOG_PATH: # optional
+            - TEMP_PATH: "/tmp" # optional, default to ./tmp, beside the server binary
+        # networks:
+        #     - yomuyume
+
+    # yomuyume-caddy:
+    #     container_name: yomuyume-caddy
+    #     image: caddy
+    #     build:
+    #         context: .
+    #         dockerfile: caddy.Dockerfile
+    #     restart: unless-stopped
+    #     ports:
+    #         - "80:80"
+    #         - "443:443"
+    #     volumes:
+    #         - ./caddy:/usr/bin/caddy
+    #         - ./caddy/data:/data
+    #         - ./caddy/config:/config
+    #         - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+
+    # cloudflared:
+    #     container_name: cloudflared
+    #     restart: unless-stopped
+    #     command: tunnel --post-quantum --no-autoupdate run
+    #     environment:
+    #         - TUNNEL_TRANSPORT_PROTOCOL: "quic"
+    #         - TUNNEL_TOKEN: "<TOKEN>"
+    #     image: cloudflare/cloudflared:latest
+    #     networks:
+    #         - yomuyume
+
+# networks:
+#     yomuyume:
+#         name: yomuyume
+#         external: true

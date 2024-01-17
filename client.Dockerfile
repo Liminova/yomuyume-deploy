@@ -1,5 +1,4 @@
-# see all versions at https://hub.docker.com/r/oven/bun/tags
-FROM oven/bun:alpine AS install
+FROM node:21-alpine AS install
 
 # Prepare
 RUN apk add --no-cache git wget
@@ -11,8 +10,9 @@ RUN chmod +x /temp/simple-http-server
 
 # Build
 WORKDIR /temp/yomuyume-client
-RUN bun install
-RUN bun --bun run generate
+RUN npm install -g pnpm
+RUN pnpm i
+RUN pnpm generate
 
 # New stage for smaller image
 FROM alpine:latest
@@ -20,4 +20,4 @@ WORKDIR /usr/src/app
 COPY --from=install /temp/yomuyume-client/dist ./public
 COPY --from=install /temp/simple-http-server /usr/local/bin/simple-http-server
 EXPOSE 3000/tcp
-ENTRYPOINT [ "/usr/local/bin/simple-http-server", "--index", "--threads", "8", "--port", "3000", "public" ]
+ENTRYPOINT [ "/usr/local/bin/simple-http-server", "--index", "--threads", "8", "--try-file", "public/404/index.html", "--port", "3000", "public" ]
