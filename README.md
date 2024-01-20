@@ -1,6 +1,15 @@
 # Yomuyume deployment guide
 
 # Table of contents
+- [Pre-requisites](#pre-requisites)
+- [Configuring the `docker-compose.yml`](#configuring-the-docker-composeyml)
+    - [The server](#the-server)
+    - [The client & reverse proxy](#the-client--reverse-proxy)
+        - [Option 1 - No reverse proxy](#option-1---no-reverse-proxy)
+        - [Option 2.1 - Caddy + static client](#option-21---caddy--static-client)
+        - [Option 2.2 - Caddy + client with Node/Bun server](#option-22---caddy--client-with-nodebun-server)
+        - [Option 3 - Cloudflare Tunnel + client with Node/Bun server](#option-3---cloudflare-tunnel--client-with-nodebun-server)
+- [Upgrade](#upgrade-will-be-improved-in-the-future)
 
 # Pre-requisites
 - A domain, optional if you're not planning to use a reverse proxy.
