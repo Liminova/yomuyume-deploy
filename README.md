@@ -1,83 +1,84 @@
 # Yomuyume deployment guide
-Note: `client-server`: `yomuyume-client` + `yomuyume-server`
 
 # Table of contents
-- [Prerequisites](#prerequisites)
-- [Install Docker Engine](#install-docker-engine)
-- [Configuring the `client-server`](#configuring-the-client-server)
-- [Reverse proxy](#reverse-proxy)
-    - [Caddy](#caddy)
-    - [Cloudflare Tunnel](#cloudflare-tunnel)
-    - [Caddy + Cloudflare Tunnel](#caddy--cloudflare-tunnel)
 
-## Prerequisites
-- A domain: optional if you're not planning to use a reverse proxy.
+# Pre-requisites
+- A domain, optional if you're not planning to use a reverse proxy.
 
-- A server:
-    - CPU: preferably `amd64` architecture. I don't have an ARM server to test.
-    - RAM/storage: you decide, but here's the bare minimum for just to run:
+- A server, preferably with a x86_64 CPU, an NVIDIA GPU with CUDA support for the recommendation system.
 
-        | Component                             | RAM          | Storage |
-        |---------------------------------------|--------------|---------|
-        | `client-server` | 6MB          | 44MB    |
-        | `caddy`                               | 10MB to 20MB | 7MB     |
-        | `cloudflare`                          | 25MB         | 60MB    |
+- `git clone https://github.com/Liminova/yomuyume-deploy.git && cd yomuyume-deploy`
 
+- Create an empty database file: `touch sqlite.db`
 
-## Install Docker Engine
-Using [this guide](https://docs.docker.com/engine/install/), make sure to follow the post-installation steps. Skip if you already have Docker installed.
+- Install Docker Engine using [this guide](https://docs.docker.com/engine/install/), make sure to follow the post-installation steps. Skip if you already have Docker installed.
 
-## Configuring the `client-server`
-1. Clone/download this repo
+- Create a new docker network `docker network create yomuyume`
 
-2. Run `touch sqlite.db`
+# Configuring the `docker-compose.yml`
 
-3. In `docker-compose.yml`
-    > Note: how `ports` and `volumes` are defined: `<host>:<container>`
-    - `yomuyume-server` > `volumes` > rewrite library path to your own
-    > Note: run `openssl rand -hex 32` to generate a random string
-    - `yomuyume-server` > `environment` > change `JWT_SECRET` and `SMTP` credentials
+## The server
+- Change the library path to your own in `volumes`
+    > How `ports` and `volumes` are defined: `<host>:<container>`
+- Change `JWT_SECRET` and `SMTP` credentials in `environment`
+    > Run `openssl rand -hex 32` to generate a random string
 
-4. Run `docker compose up -d`
+## The client & reverse proxy
 
-The `client-server` should be up and listening on port `8080` and `8081` respectively.
+### Option 1 - No reverse proxy
+This expose the client and server directly to the host machine through port `3000` and `3001` respectively.
 
-That's it. Bring-your-own-reverse-proxy or follow the guide below.
+<img src="assets/bare.png" alt="no-reverse-proxy" style="max-width:450px">
 
-## Reverse proxy
-> There are several configuration option you can choose from
+1. Inside `docker-compose.yml`, keep `yomuyume-server` and `yomuyume-client` (either `yomuyume-client-bun` or `yomuyume-client-node`, Bun is faster but doesn't support non-AVX CPUs). Comment out or remove the rest.
 
-0. Create a new docker network `docker network create yomuyume`
+2. `docker compose up -d --build`
 
-### Caddy
-> Requires a domain. The server must be accessible *from the internet* to be exposed to the internet.
+The `yomuyume-client` should be up and running on `http://<your-server-ip>:3000` and `yomuyume-server` on `http://<your-server-ip>:3001`.
 
-1. In `docker-compose.yml`
-    - Remove the `ports`, uncomment the `networks` for `client-server`
-    - Uncomment `caddy` service
-    - Uncomment `networks` at the bottom
+### Option 2.1 - Caddy + static client
+Reverse proxy the `yomuyume-server` and serve the `yomuyume-client` as static files. This allow both client and server to share the same port, or better, the same domain with HTTPS.
+
+<img src="assets/caddy-static.png" alt="caddy-static" style="max-width:500px">
+
+1. Inside `docker-compose.yml`
+    - Keep `yomuyume-server`, `yomuyume-client-build` and `yomuyume-caddy`. Comment out or remove the rest.
+    - Remove the `ports` for `yomuyume-server`
 
 2. Prepare Caddy binary
-    - Follow this [community guide](https://caddy.community/t/how-to-use-dns-provider-modules-in-caddy-2/8148) to download the Caddy binary with your DNS provider plugin
+    - Follow this [community guide](https://caddy.community/t/how-to-use-dns-provider-modules-in-caddy-2/8148) to download the Caddy binary with your DNS provider plugin, place it in the root directory of this repo
     - Rename the binary to `caddy`
     - Run `sudo chmod +x ./caddy`
 
-3. In `./caddy/Caddyfile`
-    - Replace your own domain
-    - Replace `<PROVIDER>` and `<PROVIDER_TOKEN>` to your own
+3. Inside `./caddy/Caddyfile`
+    - Replace `example.com` with your own domain
+    - Replace `comic` with your preferred subdomain
 
-### Cloudflare Tunnel
-> Requires a domain. The server can't or don't want to be exposed to the internet.
+4. Run `docker compose up -d --build`
 
-1. In `docker-compose.yml`
-    - Remove the `ports`, uncomment the `networks` for `client-server`
-    - Uncomment `cloudflared` service
-    - Uncomment `networks` at the bottom
+The `client-server` should be up and running on your specified domain.
+
+> If you don't *own* a domain <br> 1. Create a free subdomain on DuckDNS <br> 2. Replace `./caddy/Caddyfile` with `./caddy/no-domain.Caddyfile` of caddy inside `docker-compose.yml`
+
+### Option 2.2 - Caddy + client with Node/Bun server
+This doesn't make any sense, just use the above option.
+
+<img src="assets/caddy-bun-node.png" alt="caddy-bun-node" style="max-width:500px">
+
+### Option 3 - Cloudflare Tunnel + client with Node/Bun server
+The first two options require your server is directly exposed to the internet. If you're hosting yomuyume from your home, it's likely that you're behind a Carrier-grade NAT. This is essentially a situation where you have a router behind another router, but the one facing the internet is managed by your carrier, preventing you from exposing ports to the internet. This might also be the case if, for any reason, you prefer not to expose your ports. Under these circumstances, your best choice would be to use Cloudflare Tunnel.
+
+The Cloudflare daemon, which operates on the same Docker network as your server, securely manages traffic between your server and their global network before it reaches the internet.
+
+<img src="assets/cloudflare-tunnel.png" alt="cloudflare-tunnel" style="max-width:500px">
+
+1. Inside `docker-compose.yml`
+    - Keep `yomuyume-server`, `yomuyume-client` (either `yomuyume-client-bun` or `yomuyume-client-node`, Bun is faster but doesn't support non-AVX CPUs), `cloudflared`. Comment out or remove the rest.
 
 2. Go to [one.dash.cloudflare.com](https://one.dash.cloudflare.com/)
     - Do the basic steps to create a Team.
     - `Access` > `Tunnels` > create new tunnel > get the token at last step
-    - `docker-compose.yml` > `services` > `cloudflared` > `environment` > replace `<TOKEN>` with your own
+    - Inside `docker-compose.yml`, replace the `<TOKEN>` environment variable of `cloudflared` with your own
 
 3. Adding hostname to Cloudflare on Cloudflare One dashboard
     - `Access` > `Tunnels` > modify > `Public Hostnames` tab
@@ -96,39 +97,7 @@ That's it. Bring-your-own-reverse-proxy or follow the guide below.
 
 The `client-server` should be up and running on your specified domain.
 
-### Caddy + Cloudflare Tunnel
-> Same as above, but using Caddy to handle routing instead of creating multiple hostnames in the Tunnel dashboard.
-
-1. In `docker-compose.yml`
-    - Remove the `ports`, uncomment the `networks` for `client-server`
-    - Uncomment `caddy` and `cloudflared` service
-    - Remove the `ports` for `caddy`
-    - Uncomment `networks` at the bottom
-
-2. Prepare Caddy binary (same as above)
-
-3. In `./caddy/Caddyfile`
-    - Replace your own domain
-    - Remove the `tls` block
-    - Add `http://` to before your domain to disable TLS
-        ```
-        ...
-        @comic host http://<your-domain>
-        handle @comic {
-            ...
-        ```
-
-4. Create one hostname on Cloudflare One dashboard
-    - Subdomain, domain: your own
-    - Path: leave blank
-    - Type: `HTTP`
-    - URL: `caddy:80`
-
-5. Run `docker compose up -d`
-
-The `client-server` should be up and running on your specified domain.
-
-## Upgrade
+# Upgrade (will be improved in the future)
 - Stop all containers: `docker compose down`
 - Clear docker build cache: `docker builder prune -a`
 - Remove images without containers: `docker image prune -a`

@@ -1,16 +1,37 @@
 version: "3"
 services:
-    yomuyume-client:
+    yomuyume-client-build:
+        container_name: yomuyume-client-build
+        image: node:21-alpine
+        volumes:
+            - ./client:/app
+        command: sh -c "sh /app/build.sh"
+        environment:
+            CLEAN_PNPM: false # to speed up future builds, true to delete pnpm cache after build
+
+    yomuyume-client-bun:
         container_name: yomuyume-client
-        image: yomuyume-client
+        image: yomuyume-client-node
         restart: unless-stopped
         build:
             context: .
-            dockerfile: client.Dockerfile
+            dockerfile: client.bun.Dockerfile
         ports:
            - "3000:3000"
-        # networks:
-        #     - yomuyume
+        networks:
+            - yomuyume
+
+    yomuyume-client-node:
+        container_name: yomuyume-client
+        image: yomuyume-client-node
+        restart: unless-stopped
+        build:
+            context: .
+            dockerfile: client.node.Dockerfile
+        ports:
+           - "3000:3000"
+        networks:
+            - yomuyume
 
     yomuyume-server:
         container_name: yomuyume-server
@@ -23,63 +44,64 @@ services:
             # path in container must match DATABASE_URL
             - ./sqlite.db:/usr/local/bin/sqlite.db
             # path in container must match LIBRARY_PATH
-            - ./library:/library
+            - <CHANGE_ME>:/library
         ports:
            - "3001:3000"
         environment:
-            # - APP_NAME: "Yomuyume" # optional
-            - LIBRARY_PATH: "/library"
-            # - SERVER_ADDRESS: "0.0.0.0" # optional, better not change it
-            # - SERVER_PORT: 3000 # optional, better not change it
-            - DATABASE_URL: "sqlite:/usr/local/bin/sqlite.db"
+            # APP_NAME: "yomuyume" # optional
+            LIBRARY_PATH: "/library"
+            # SERVER_ADDRESS: "0.0.0.0" # optional, better not change it
+            # SERVER_PORT: 3000 # optional, better not change it
+            DATABASE_URL: "sqlite:/usr/local/bin/sqlite.db"
 
-            - JWT_SECRET: "<CHANGE_ME>"
-            - JWT_MAXAGE_HOUR: 2592000 # 30 days
+            JWT_SECRET: "<CHANGE_ME>"
+            JWT_MAXAGE_DAY: 30
 
             # SMTP optional, but users can't reset password and delete account
-            # - SMTP_HOST: "smtp.gmail.com"
-            # - SMTP_PORT: 587
-            # - SMTP_SECURE: tls
-            # - SMTP_USER: <CHANGE_ME>
-            # - SMTP_PASS: <CHANGE_ME> # https://myaccount.google.com/apppasswords
-            # - SMTP_FROM: <CHANGE_ME>@gmail.com
-            # - SMTP_FROM_NAME: "Yomuyume"
+            # SMTP_HOST: "smtp.gmail.com"
+            # SMTP_PORT: 587
+            # SMTP_SECURE: tls
+            # SMTP_USER: <CHANGE_ME>
+            # SMTP_PASS: <CHANGE_ME> # https://myaccount.google.com/apppasswords
+            # SMTP_FROM: <CHANGE_ME>@gmail.com
+            # SMTP_FROM_NAME: "yomuyume"
 
-            # - FFMPEG_PATH: # if library contains avif or other codec
-            # - DJXL_PATH: # if library contains jpeg-xl images
-            # - FFMPEG_LOG_PATH: # optional
-            - TEMP_PATH: "/tmp" # optional, default to ./tmp, beside the server binary
+            # FFMPEG_PATH: # if library contains avif or other codec
+            # DJXL_PATH: # if library contains jpeg-xl images
+            # FFMPEG_LOG_PATH: # optional
+            TEMP_PATH: "/tmp" # optional, default to ./tmp, beside the server binary
         # networks:
         #     - yomuyume
 
-    # yomuyume-caddy:
-    #     container_name: yomuyume-caddy
-    #     image: caddy
-    #     build:
-    #         context: .
-    #         dockerfile: caddy.Dockerfile
-    #     restart: unless-stopped
-    #     ports:
-    #         - "80:80"
-    #         - "443:443"
-    #     volumes:
-    #         - ./caddy:/usr/bin/caddy
-    #         - ./caddy/data:/data
-    #         - ./caddy/config:/config
-    #         - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+    yomuyume-caddy:
+        container_name: yomuyume-caddy
+        image: caddy
+        build:
+            context: .
+            dockerfile: caddy.Dockerfile
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./caddy:/usr/bin/caddy
+            - ./caddy/data:/data
+            - ./caddy/config:/config
+            - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+            - ./client/public:/usr/share/caddy/public
 
-    # cloudflared:
-    #     container_name: cloudflared
-    #     restart: unless-stopped
-    #     command: tunnel --post-quantum --no-autoupdate run
-    #     environment:
-    #         - TUNNEL_TRANSPORT_PROTOCOL: "quic"
-    #         - TUNNEL_TOKEN: "<TOKEN>"
-    #     image: cloudflare/cloudflared:latest
-    #     networks:
-    #         - yomuyume
+    cloudflared:
+        container_name: cloudflared
+        restart: unless-stopped
+        command: tunnel --post-quantum --no-autoupdate run
+        environment:
+            TUNNEL_TRANSPORT_PROTOCOL: "quic"
+            TUNNEL_TOKEN: "<TOKEN>"
+        image: cloudflare/cloudflared:latest
+        networks:
+            - yomuyume
 
-# networks:
-#     yomuyume:
-#         name: yomuyume
-#         external: true
+networks:
+    yomuyume:
+        name: yomuyume
+        external: true

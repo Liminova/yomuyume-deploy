@@ -1,2 +1,5 @@
 *.db
 *.log
+client/.pnpm-store
+client/public
+client/yomuyume-client
