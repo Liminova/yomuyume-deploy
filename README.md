@@ -1,3 +1,7 @@
+### Moved to [Liminova/yomuyume](https://github.com/Liminova/yomuyume)
+
+---
+
 # Yomuyume deployment guide
 
 # Table of contents
